@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetAcad Trainer — Performance Management System</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Firebase (compat libraries — plain script tags, no build step needed) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="light-mode">
+
+<!-- Global loading indicator, shown while talking to Firebase -->
+<div id="global-loader" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.35); align-items:center; justify-content:center; flex-direction:column; gap:10px; color:#fff; font-weight:600;">
+  <div style="width:42px;height:42px;border:4px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+  <span>Syncing with Firebase…</span>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg);}}</style>
+
+<div id="auth-screen" class="auth-overlay">
+  <div class="auth-shell">
+    <div class="auth-brand-panel">
+      <div class="auth-brand-blob blob-1"></div>
+      <div class="auth-brand-blob blob-2"></div>
+      <div class="auth-brand-content">
+        <div class="auth-brand-icon">🎓</div>
+        <h1>NetAcad</h1>
+        <p class="auth-brand-tag">Trainer Performance Dashboard</p>
+        <ul class="auth-brand-points">
+          <li>📊 Real-time student performance tracking</li>
+          <li>☁️ Securely synced to the cloud</li>
+          <li>🔒 Private — accessible only by you</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="auth-form-panel">
+      <div class="auth-card active" id="auth-login-card">
+        <div class="auth-header">
+          <div class="auth-logo">🔐</div>
+          <h2>Welcome Back</h2>
+          <p>Sign in to your private dashboard</p>
+        </div>
+        <form id="login-form" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label for="login-username">Email</label>
+            <input type="email" id="login-username" placeholder="Enter your email" required />
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" placeholder="Enter password" required />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+        </form>
+        <div class="auth-footer">
+          <p><a href="#" onclick="switchAuthCard('recover')">Forgot Password?</a></p>
+        </div>
+      </div>
+
+      <div class="auth-card" id="auth-recover-card">
+        <div class="auth-header">
+          <div class="auth-logo">✉️</div>
+          <h2>Reset Password</h2>
+          <p>We'll email you a secure password reset link</p>
+        </div>
+        <form id="recover-step1" onsubmit="handleFindUser(event)">
+          <div class="form-group">
+            <label for="recover-username">Email</label>
+            <input type="email" id="recover-username" placeholder="Email" required />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Send Reset Link</button>
+        </form>
+        <div class="auth-footer">
+          <p><a href="#" onclick="switchAuthCard('login')">Back to Sign In</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">🎓</div>
+    <div class="brand-text">
+      <span class="brand-title">NetAcad</span>
+      <span class="brand-sub">Trainer Dashboard</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+      <span class="nav-icon">📊</span> Dashboard
+    </a>
+    <a class="nav-item" data-page="students" onclick="showPage('students')">
+      <span class="nav-icon">👥</span> Students
+    </a>
+    <a class="nav-item" data-page="attendance" onclick="showPage('attendance')">
+      <span class="nav-icon">📋</span> Attendance
+    </a>
+    <a class="nav-item" data-page="modules" onclick="showPage('modules')">
+      <span class="nav-icon">📘</span> Module Exams
+    </a>
+    <a class="nav-item" data-page="schoolexams" onclick="showPage('schoolexams')">
+      <span class="nav-icon">📝</span> School Exams
+    </a>
+    <a class="nav-item" data-page="analytics" onclick="showPage('analytics')">
+      <span class="nav-icon">📈</span> Analytics
+    </a>
+    <a class="nav-item" data-page="datamanage" onclick="showPage('datamanage')">
+      <span class="nav-icon">⚙️</span> Data Management
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <button class="theme-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">
+      <span id="theme-icon">🌙</span> <span id="theme-label">Dark Mode</span>
+    </button>
+    <a class="nav-item" onclick="handleLogout()" style="color: var(--danger); margin-top: 10px; padding: 8px 12px;">
+      <span class="nav-icon">🚪</span> Logout
+    </a>   
+  </div>
+</aside>
+
+<!-- ══════════════════════════════════════════════
+     MAIN CONTENT
+══════════════════════════════════════════════ -->
+<main class="main-content">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+    <div class="topbar-title" id="page-title">Dashboard</div>
+    <div class="topbar-right">
+      <span class="date-display" id="today-date"></span>
+    </div>
+  </header>
+
+  <!-- PAGE: DASHBOARD -->
+  <section class="page active" id="page-dashboard">
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <p>Overview of your class performance</p>
+    </div>
+
+    <div class="toolbar no-print">
+      <label for="dashboard-class-filter" style="font-weight:600;align-self:center;">View Class:</label>
+      <select id="dashboard-class-filter" class="search-box" style="flex:0 0 200px;" onchange="renderDashboard()">
+        <option value="">All Classes (Combined)</option>
+      </select>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid" id="dashboard-stats"></div>
+
+    <!-- Charts Row -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>Module Averages</h3>
+        <canvas id="dash-module-chart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Attendance Overview</h3>
+        <canvas id="dash-attendance-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="info-card" style="margin-top:1.5rem">
+      <h3>📚 Per-Class Performance Breakdown</h3>
+      <div id="dashboard-class-breakdown"></div>
+    </div>
+
+    <div class="toolbar no-print" style="margin-top:1.5rem;">
+      <select id="bulk-print-class-filter" class="search-box" style="flex:0 0 220px;">
+        <option value="">All Classes</option>
+      </select>
+      <button class="btn btn-primary" onclick="printAllReports('bulk-print-class-filter')">
+        🖨 Bulk Export / Print Reports
+      </button>
+    </div>
+
+    <!-- Top & Bottom Students -->
+    <div class="two-col">
+      <div class="info-card">
+        <h3>🏆 Top Performers</h3>
+        <div id="top-performers"></div>
+      </div>
+      <div class="info-card">
+        <h3>⚠️ Students Needing Support</h3>
+        <div id="need-support"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAGE: STUDENTS -->
+  <section class="page" id="page-students">
+    <div class="page-header">
+      <h1>Students</h1>
+      <p>Manage your class roster</p>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" class="search-box" id="student-search" placeholder="🔍 Search students…" oninput="renderStudentList()" />
+      <select id="class-filter" class="search-box" style="flex:0 0 180px;" onchange="renderStudentList()">
+        <option value="">All Classes</option>
+      </select>
+      <button class="btn btn-primary" onclick="openAddStudentModal()">+ Add Student</button>
+    </div>
+      
+    <div class="bulk-import-container" style="margin: 1.5rem 0; padding: 1rem; border: 2px dashed var(--border); border-radius: var(--radius); background: var(--surface2);">
+      <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--accent);">Batch Import Student Roster</h4>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Upload a plain text or CSV file containing one student name per line.
+      </p>
+      
+      <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <input type="file" id="bulk-student-file" accept=".csv,.txt" class="form-control" style="flex: 1; min-width: 200px;" />
+        <select id="bulk-student-class" class="search-box" style="flex:0 0 180px;">
+          <option value="">— Unassigned —</option>
+        </select>
+        <button class="btn btn-success" onclick="handleBulkStudentUpload()">
+          📤 Upload & Import List
+        </button>
+      </div>
+    </div>
+
+    <div class="student-grid" id="student-list"></div>
+  </section>
+
+  <!-- PAGE: STUDENT PROFILE -->
+  <section class="page" id="page-profile">
+    <div class="page-header">
+      <button class="btn btn-ghost" onclick="showPage('students')">← Back to Students</button>
+    </div>
+    <div id="profile-content"></div>
+  </section>
+
+  <!-- PAGE: ATTENDANCE -->
+  <section class="page" id="page-attendance">
+    <div class="page-header">
+      <h1>Attendance Tracker Register</h1>
+      <p>Select dates to record attendance or export custom range registers.</p>
+    </div>
+
+    <div class="info-card" style="margin-bottom: 20px;">
+      <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="attendance-date" style="font-weight: 600;">Single Date View:</label>
+          <input type="date" id="attendance-date" onchange="loadAttendanceForDate()" />
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label for="attendance-class-filter" style="font-weight: 600;">Class:</label>
+          <select id="attendance-class-filter" onchange="loadAttendanceForDate()">
+            <option value="">All Classes</option>
+          </select>
+        </div>
+        
+        <div style="border-left: 2px solid var(--border); padding-left: 1rem; display: flex; gap: 1rem; align-items: flex-end;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="register-start-date" style="font-weight: 600;">Export Start Date:</label>
+            <input type="date" id="register-start-date" />
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="register-end-date" style="font-weight: 600;">Export End Date:</label>
+            <input type="date" id="register-end-date" />
+          </div>
+          <button class="btn btn-primary" onclick="downloadCustomRegister()">📥 Download Range Register</button>
+        </div>
+      </div>
+      <div style="margin-top: 15px; display: flex; gap: 10px;">
+        <button class="btn btn-primary" onclick="saveAttendance()">💾 Save Attendance</button>
+        <button class="btn btn-ghost" onclick="markAllPresent()">✓ Mark All Present</button>
+        <button class="btn btn-ghost" onclick="markAllAbsent()">✗ Mark All Absent</button>
+      </div>
+    </div>
+
+    <div class="attendance-table-wrap">
+      <table class="data-table" id="attendance-table">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Present</th>
+            <th>Absent</th>
+            <th>Status Badge</th>
+            <th>Total Present</th>
+            <th>Total Absent</th>
+          </tr>
+        </thead>
+        <tbody id="attendance-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="chart-card" style="margin-top:2rem">
+      <h3>Attendance Summary</h3>
+      <canvas id="attendance-summary-chart"></canvas>
+    </div>
+  </section>
+
+  <!-- PAGE: MODULE EXAMS -->
+  <section class="page" id="page-modules">
+    <div class="page-header">
+      <h1>Module Exam Scores</h1>
+      <p>NetAcad Modules 1–14</p>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" class="search-box" id="module-search" placeholder="🔍 Filter students…" oninput="renderModuleTable()" />
+      <select id="module-class-filter" class="search-box" style="flex:0 0 180px;" onchange="renderModuleTable()">
+        <option value="">All Classes</option>
+      </select>
+      <button class="btn btn-primary" onclick="saveAllModuleScores()">💾 Save All Scores</button>
+    </div>
+
+    <div class="bulk-import-container" style="margin: 1.5rem 0; padding: 1rem; border: 2px dashed var(--border); border-radius: var(--radius); background: var(--surface2);">
+      <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--accent);">Bulk Upload Module Scores</h4>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Download a CSV template (matches the class filter above), fill in scores offline, then upload it back. Students are matched by name.
+      </p>
+      <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <button class="btn btn-ghost" onclick="downloadModuleScoreTemplate()">📄 Download CSV Template</button>
+        <input type="file" id="bulk-module-file" accept=".csv" style="flex: 1; min-width: 200px;" />
+        <button class="btn btn-success" onclick="handleBulkModuleUpload()">📤 Upload Scores CSV</button>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table class="data-table scores-table" id="module-table">
+        <thead id="module-thead"></thead>
+        <tbody id="module-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- PAGE: SCHOOL EXAMS -->
+  <section class="page" id="page-schoolexams">
+    <div class="page-header">
+      <h1>School Exam Scores</h1>
+      <p>Mid-Terms and End-Terms</p>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" class="search-box" id="exam-search" placeholder="🔍 Filter students…" oninput="renderExamTable()" />
+      <select id="exam-class-filter" class="search-box" style="flex:0 0 180px;" onchange="renderExamTable()">
+        <option value="">All Classes</option>
+      </select>
+      <button class="btn btn-primary" onclick="saveAllExamScores()">💾 Save All Scores</button>
+    </div>
+
+    <div class="bulk-import-container" style="margin: 1.5rem 0; padding: 1rem; border: 2px dashed var(--border); border-radius: var(--radius); background: var(--surface2);">
+      <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--accent);">Bulk Upload Exam Scores</h4>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Download a CSV template (matches the class filter above), fill in scores offline, then upload it back. Students are matched by name.
+      </p>
+      <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <button class="btn btn-ghost" onclick="downloadExamScoreTemplate()">📄 Download CSV Template</button>
+        <input type="file" id="bulk-exam-file" accept=".csv" style="flex: 1; min-width: 200px;" />
+        <button class="btn btn-success" onclick="handleBulkExamUpload()">📤 Upload Scores CSV</button>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table class="data-table scores-table" id="exam-table">
+        <thead id="exam-thead"></thead>
+        <tbody id="exam-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- PAGE: ANALYTICS -->
+  <section class="page" id="page-analytics">
+    <div class="page-header">
+      <h1>Analytics</h1>
+      <p>Class-wide performance insights</p>
+    </div>
+
+    <div class="toolbar no-print">
+      <label for="analytics-class-filter" style="font-weight:600;align-self:center;">View Class:</label>
+      <select id="analytics-class-filter" class="search-box" style="flex:0 0 200px;" onchange="renderAnalytics()">
+        <option value="">All Classes (Combined)</option>
+      </select>
+    </div>
+
+    <div class="stats-grid" id="analytics-stats"></div>
+
+    <div class="info-card" style="margin:1rem 0;">
+      <h3>📚 Per-Class Averages</h3>
+      <div id="analytics-class-breakdown"></div>
+    </div>
+
+    <div class="toolbar no-print">
+      <select id="analytics-print-class-filter" class="search-box" style="flex:0 0 220px;">
+        <option value="">All Classes</option>
+      </select>
+      <button class="btn btn-primary" onclick="printAllReports('analytics-print-class-filter')">
+        🖨 Bulk Export / Print Reports
+      </button>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>Module Averages</h3>
+        <canvas id="analytics-module-chart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>School Exam Averages</h3>
+        <canvas id="analytics-exam-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card" style="margin-top:1.5rem">
+      <h3>Top 10 Students — Overall Average</h3>
+      <canvas id="analytics-top-chart"></canvas>
+    </div>
+
+    <div class="info-card" style="margin-top:1.5rem">
+      <h3>Module Analysis</h3>
+      <div id="module-analysis-table"></div>
+    </div>
+  </section>
+
+  <!-- PAGE: DATA MANAGEMENT -->
+  <section class="page" id="page-datamanage">
+    <div class="page-header">
+      <h1>Data Management</h1>
+      <p>Manage your records</p>
+    </div>
+
+      <div class="info-card">
+        <div class="card-icon">📊</div>
+        <h3>Storage Usage</h3>
+        <div id="storage-usage"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Add/Edit Student Modal -->
+<div class="modal-overlay" id="student-modal" onclick="closeModal(event,'student-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Add Student</h2>
+      <button class="modal-close" onclick="document.getElementById('student-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="student-name-input" class="input-field" placeholder="e.g. Charles Mwai" />
+      </div>
+      <div class="form-group" style="margin-top:14px;">
+        <label>Class</label>
+        <select id="student-class-input" class="input-field"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('student-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" id="modal-save-btn" onclick="saveStudentModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Print Report Modal -->
+<div class="modal-overlay" id="report-modal" onclick="closeModal(event,'report-modal')">
+  <div class="modal modal-wide">
+    <div class="modal-header no-print">
+      <h2 id="report-modal-title">Student Report</h2>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-primary" onclick="window.print()">🖨 Print / Save PDF</button>
+        <button class="modal-close" onclick="document.getElementById('report-modal').classList.remove('open')">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" id="report-content"></div>
+  </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div class="modal-overlay" id="confirm-modal" onclick="closeModal(event,'confirm-modal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>⚠ Confirm</h2>
+      <button class="modal-close" onclick="document.getElementById('confirm-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-msg"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('confirm-modal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-danger" id="confirm-action-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="firebase-config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+/* ═══════════════════════════════════════════════════════════════
+   FIRESTORE SECURITY RULES
+   firestore.rules.txt
+
+   HOW TO APPLY:
+   1. Firebase Console → Authentication → Users tab.
+      Find your account in the list and copy its "User UID" value
+      (a long string like "Xy7aB2cQ...").
+   2. Firebase Console → Firestore Database → "Rules" tab.
+   3. Delete the existing contents of the editor.
+   4. Paste everything below the line of dashes.
+   5. Replace OWNER_UID below with the UID you copied in step 1.
+   6. Click "Publish".
+
+   WHAT THIS DOES:
+   - Locks the ENTIRE database to one specific Firebase account, by
+     its permanent UID rather than its email address. A UID never
+     changes for the lifetime of the account, even if you later
+     change your email (Authentication → Users → edit) — so you will
+     never get locked out just because an email address becomes
+     unreachable (e.g. leaving an organization). You only need to
+     remember your password (or use "Forgot Password" against
+     whatever email is currently on the account) to keep access.
+   - Even if someone else somehow created a separate Firebase Auth
+     account (e.g. by calling the sign-up API directly, bypassing
+     the app's UI, since the front-end "Create Account" form has
+     been removed but the Email/Password provider itself can't be
+     disabled without also blocking your own login), they still
+     could not read or write a single document, because their UID
+     would not match yours.
+   - Unauthenticated visitors get nothing, as before.
+═══════════════════════════════════════════════════════════════ */
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner() {
+      return request.auth != null
+        && request.auth.uid == "OWNER_UID";
+    }
+
+    match /students/{studentId} {
+      allow read, write: if isOwner();
+    }
+
+    match /moduleScores/{studentId} {
+      allow read, write: if isOwner();
+    }
+
+    match /examScores/{studentId} {
+      allow read, write: if isOwner();
+    }
+
+    match /attendance/{dateId} {
+      allow read, write: if isOwner();
+    }
+
+    match /settings/{docId} {
+      allow read, write: if isOwner();
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner();
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
