@@ -25,7 +25,7 @@ const EXAM_LABELS = ["Mid-Term 1","End-Term 1","Mid-Term 2","End-Term 2","Mid-Te
 // Classes your students can be assigned to. Add, rename, or remove
 // entries here any time — every dropdown in the app reads from this
 // single list, so there's only one place to edit.
-const CLASSES = ["Grade 6", "Grade 7", "Grade 8 Lochoredome"];
+const CLASSES = ["Grade 6", "Grade 7", "Grade 8 Lochoredome", "Grade 9"];
 
 const charts = {};
 let editingStudentId = null;
