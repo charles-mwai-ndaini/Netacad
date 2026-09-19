@@ -220,7 +220,7 @@ body {
 
 .data-table th {
   position: sticky;
-  top: 60px;
+  top: 0px;
   z-index: 100;
 
   background: var(--sidebar-bg);
