@@ -898,7 +898,9 @@ function loadAttendanceForDate() {
     let status = rec[s.id] || "present";
     if (isHoliday) status = "holiday";
     const stats = getAttendanceStats(db, s.id);
-    const disabled = (isWeekend || isHoliday) ? "disabled" : "";
+    // const disabled = (isWeekend || isHoliday) ? "disabled" : "";
+     const disabled = "";
+     
 
     return `
       <tr>
