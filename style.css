@@ -245,6 +245,63 @@ body {
   background: var(--bg);
 }
 
+/* =========================================================
+   MODULE SCORES TABLE - STICKY HEADER
+   ========================================================= */
+
+.module-table-wrap {
+  max-height: calc(100vh - 230px);
+  overflow: auto;
+  position: relative;
+  border-radius: var(--radius);
+}
+
+/* Keep the table wide enough for all modules */
+.module-table-wrap .scores-table {
+  min-width: max-content;
+  width: 100%;
+}
+
+/* Freeze Module Scores header */
+#module-thead th {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--sidebar-bg);
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+}
+
+/* Freeze Student column when scrolling horizontally */
+#module-thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 120;
+  background: var(--sidebar-bg);
+}
+
+/* Freeze student names */
+#module-tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: var(--surface);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Make module columns consistent */
+#module-thead th:not(:first-child),
+#module-tbody td:not(:first-child) {
+  min-width: 82px;
+  text-align: center;
+}
+
+/* Hover effect */
+#module-tbody tr:hover td:first-child {
+  background: var(--bg);
+}
+
 .score-input { width: 56px; padding: 5px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); color: var(--text); font-size: 13px; text-align: center; outline: none; transition: border-color 0.15s; }
 .score-input:focus { border-color: var(--accent); }
 
