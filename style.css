@@ -519,3 +519,21 @@ body {
   .report-section, .report-table tr { page-break-inside: avoid; break-inside: avoid; }
   #report-modal { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; display: block !important; }
 } */
+/* Dark Mode & Sticky Table Overrides */
+body.dark-mode .data-table th,
+body.dark-mode #module-thead th,
+body.dark-mode #module-thead th:first-child {
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+  border-bottom: 1px solid var(--border);
+}
+
+body.dark-mode #module-tbody td:first-child {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border-right: 1px solid var(--border);
+}
+
+body.dark-mode #module-tbody tr:hover td:first-child {
+  background: var(--surface2) !important;
+}
