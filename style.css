@@ -583,3 +583,49 @@ body.dark-mode #module-tbody tr:hover td:first-child {
 .completed-students-badge { display:inline-block; padding:.3rem .55rem; border-radius:999px; background:#e6fffa; color:#276749; font-size:.8rem; font-weight:700; }
 .completed-students-empty { margin:0; padding:1rem; border-radius:8px; background:var(--surface, #f7fafc); color:var(--text-muted, #718096); }
 @media (max-width:600px) { .completed-students-heading { flex-direction:column; } }
+
+/* Smart slide-away sidebar (desktop): keep a slim edge visible and reveal on hover/focus. */
+@media (min-width: 769px) {
+  .sidebar {
+    transform: translateX(calc(-100% + 16px));
+    box-shadow: 6px 0 24px rgba(0, 0, 0, 0.14);
+    transition: transform 260ms cubic-bezier(0.2, 0.75, 0.25, 1), box-shadow 260ms ease;
+    will-change: transform;
+  }
+  .sidebar:hover,
+  .sidebar:focus-within {
+    transform: translateX(0);
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.22);
+  }
+  .main-content { margin-left: 16px; transition: margin-left 260ms ease; }
+  /* The narrow visible strip remains easy to discover without covering the workspace. */
+  .sidebar::after {
+    content: "›";
+    position: absolute;
+    top: 50%;
+    right: 0;
+    width: 16px;
+    height: 52px;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 20px;
+    background: var(--sidebar-active);
+    border-radius: 8px 0 0 8px;
+    opacity: 0.9;
+    pointer-events: none;
+  }
+  .sidebar:hover::after,
+  .sidebar:focus-within::after { opacity: 0; }
+}
+
+/* Touch screens use the existing menu button instead of hover. */
+@media (max-width: 768px) {
+  .sidebar { box-shadow: 8px 0 28px rgba(0, 0, 0, 0.2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .main-content { transition: none !important; }
+}
