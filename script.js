@@ -782,6 +782,47 @@ function renderDashboard() {
   renderDashAttendanceChart(db, students);
   renderTopAndSupportLists(db, students);
   renderClassBreakdownTable(db, "dashboard-class-breakdown");
+  renderFullyCompletedStudents(db, students);
+}
+
+// List learners who passed every module and the Course Final Exam (70%+).
+function renderFullyCompletedStudents(db = loadData(), students = db.students || []) {
+  const list = document.getElementById("fully-completed-students");
+  const count = document.getElementById("fully-completed-count");
+  if (!list || !count) return;
+
+  const assessments = [...MODULES, "courseFinalExam"];
+  const completed = (students || []).filter(student => {
+    const scores = db.moduleScores?.[student.id] || {};
+    return assessments.every(key => {
+      const value = scores[key];
+      return value !== undefined && value !== null && value !== "" &&
+        Number.isFinite(Number(value)) && Number(value) >= 70 && Number(value) <= 100;
+    });
+  }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+
+  count.textContent = `${completed.length} ${completed.length === 1 ? "student" : "students"}`;
+  if (!completed.length) {
+    list.innerHTML = '<p class="completed-students-empty">No students have passed all 14 modules and the Course Final Exam yet.</p>';
+    return;
+  }
+
+  list.innerHTML = `<div class="completed-students-table-wrap"><table class="completed-students-table">
+    <thead><tr><th>#</th><th>Student</th><th>Class</th><th>Completion</th><th>Status</th></tr></thead>
+    <tbody>${completed.map((student, index) => `<tr>
+      <td>${index + 1}</td>
+      <td>${escapeCompletedStudentText(student.name || "Unnamed student")}</td>
+      <td>${escapeCompletedStudentText(student.class || "—")}</td>
+      <td><strong>100%</strong></td>
+      <td><span class="completed-students-badge">All assessments passed</span></td>
+    </tr>`).join("")}</tbody>
+  </table></div>`;
+}
+
+function escapeCompletedStudentText(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+  })[character]);
 }
 
 function renderTopAndSupportLists(db, students) {
