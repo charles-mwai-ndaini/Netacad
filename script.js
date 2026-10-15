@@ -1011,7 +1011,7 @@ function renderModuleTable() {
   const tbody = document.getElementById("module-tbody");
   if (!thead || !tbody) return;
 
-  thead.innerHTML = `<tr><th>Student</th>${MODULE_LABELS.map(l => `<th>${l}</th>`).join("")}<th>Course Final Exam</th><th>Module Completion</th></tr>`;
+  thead.innerHTML = `<tr><th>Student</th>${MODULE_LABELS.map(l => `<th>${l}</th>`).join("")}<th>Course Final Exam</th><th>Completion (70%+)</th></tr>`;
   const filtered = db.students.filter(s => s.name.toLowerCase().includes(query) && (!classFilter || s.class === classFilter));
 
   tbody.innerHTML = filtered.map(s => {
@@ -1022,8 +1022,16 @@ function renderModuleTable() {
       : Number(finalScore) >= 70
         ? '<span class="badge badge-success">Pass</span>'
         : '<span class="badge badge-danger">Fail</span>';
-    const completed = MODULES.filter(m => scores[m] !== undefined && scores[m] !== null && scores[m] !== "").length;
-    const pct = MODULES.length ? completed / MODULES.length * 100 : 0;
+
+    // A component is complete only when the learner earns at least 70%.
+    const passedModules = MODULES.filter(m =>
+      scores[m] !== undefined && scores[m] !== null && scores[m] !== "" &&
+      Number(scores[m]) >= 70
+    ).length;
+    const passedFinal = finalScore !== "" && Number(finalScore) >= 70 ? 1 : 0;
+    const completedCount = passedModules + passedFinal;
+    const totalComponents = MODULES.length + 1; // 14 modules + course final exam
+    const pct = completedCount / totalComponents * 100;
 
     return `<tr>
       <td>${s.name}</td>
@@ -1035,7 +1043,7 @@ function renderModuleTable() {
       <td class="completion-cell">
         <strong>${pct.toFixed(1)}%</strong>
         <div class="completion-track"><div class="completion-fill" style="width:${pct}%"></div></div>
-        <small>${completed}/14 completed</small>
+        <small>${completedCount}/${totalComponents} assessments passed (70%+)</small>
       </td>
     </tr>`;
   }).join("");
@@ -1051,23 +1059,50 @@ function renderModuleCompletionSummary(db = loadData(), classFilter = "") {
     container.innerHTML = '<div class="completion-summary-empty">Add students to see module completion.</div>';
     return;
   }
+
+  const moduleStats = MODULES.map((module, i) => {
+    const passed = students.filter(student => {
+      const value = db.moduleScores[student.id]?.[module];
+      return value !== undefined && value !== null && value !== "" && Number(value) >= 70 && Number(value) <= 100;
+    }).length;
+    return { label: MODULE_LABELS[i], passed, pct: passed / students.length * 100 };
+  });
+  const finalPassed = students.filter(student => {
+    const value = db.moduleScores[student.id]?.courseFinalExam;
+    return value !== undefined && value !== null && value !== "" && Number(value) >= 70 && Number(value) <= 100;
+  }).length;
+  const allComponents = [...MODULES, "courseFinalExam"];
+  const possiblePasses = students.length * allComponents.length;
+  const actualPasses = students.reduce((total, student) => {
+    const scores = db.moduleScores[student.id] || {};
+    return total + allComponents.filter(key => {
+      const value = scores[key];
+      return value !== undefined && value !== null && value !== "" && Number(value) >= 70 && Number(value) <= 100;
+    }).length;
+  }, 0);
+  const overallPct = possiblePasses ? actualPasses / possiblePasses * 100 : 0;
+
   container.innerHTML = `
     <div class="completion-summary-heading">
-      <div><h3>${classFilter ? `${classFilter} — ` : "Class-wide "}Module Completion</h3><p>Completion means a score has been recorded; a score of 0 counts as completed.</p></div>
+      <div><h3>${classFilter ? `${classFilter} — ` : "All Classes — "}Pass and Completion Summary</h3>
+      <p>A module or exam counts as completed only when the learner scores 70–100%. Scores below 70%, blank scores, and unentered scores do not count as completed.</p></div>
+    </div>
+    <div class="completion-overall">
+      <div class="completion-summary-label"><strong>Overall completion across 14 modules + Course Final Exam</strong><span>${overallPct.toFixed(1)}%</span></div>
+      <div class="completion-track"><div class="completion-fill" style="width:${overallPct}%"></div></div>
+      <small>${actualPasses} of ${possiblePasses} possible learner-assessment results are at 70% or above.</small>
     </div>
     <div class="completion-summary-grid">
-      ${MODULES.map((module, i) => {
-        const completed = students.filter(student => {
-          const value = db.moduleScores[student.id]?.[module];
-          return value !== undefined && value !== null && value !== "";
-        }).length;
-        const pct = completed / students.length * 100;
-        return `<div class="completion-summary-item">
-          <div class="completion-summary-label"><strong>${MODULE_LABELS[i]}</strong><span>${pct.toFixed(1)}%</span></div>
-          <div class="completion-track"><div class="completion-fill" style="width:${pct}%"></div></div>
-          <small>${completed}/${students.length} learners</small>
-        </div>`;
-      }).join("")}
+      ${moduleStats.map(stat => `<div class="completion-summary-item">
+        <div class="completion-summary-label"><strong>${stat.label}</strong><span>${stat.pct.toFixed(1)}%</span></div>
+        <div class="completion-track"><div class="completion-fill" style="width:${stat.pct}%"></div></div>
+        <small>${stat.passed}/${students.length} learners scored 70–100%</small>
+      </div>`).join("")}
+      <div class="completion-summary-item">
+        <div class="completion-summary-label"><strong>Course Final Exam</strong><span>${(finalPassed / students.length * 100).toFixed(1)}%</span></div>
+        <div class="completion-track"><div class="completion-fill" style="width:${finalPassed / students.length * 100}%"></div></div>
+        <small>${finalPassed}/${students.length} learners scored 70–100%</small>
+      </div>
     </div>`;
 }
 
