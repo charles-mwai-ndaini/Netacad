@@ -537,3 +537,19 @@ body.dark-mode #module-tbody td:first-child {
 body.dark-mode #module-tbody tr:hover td:first-child {
   background: var(--surface2) !important;
 }
+
+
+/* Module exam completion and course final exam additions */
+.module-completion-summary { margin: 1rem 0 1.25rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.completion-summary-heading h3 { margin: 0 0 4px; font-size: 1rem; }
+.completion-summary-heading p { margin: 0 0 1rem; color: var(--text-muted); font-size: .82rem; }
+.completion-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.completion-summary-item { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+.completion-summary-label { display: flex; justify-content: space-between; gap: 8px; font-size: .82rem; margin-bottom: 7px; }
+.completion-summary-item small, .completion-cell small { display: block; margin-top: 5px; color: var(--text-muted); font-size: 11px; }
+.completion-track { height: 7px; width: 100%; overflow: hidden; background: var(--border); border-radius: 999px; margin-top: 5px; }
+.completion-fill { height: 100%; background: var(--success); border-radius: 999px; transition: width .2s ease; }
+.completion-cell { min-width: 112px; }
+.final-exam-cell { min-width: 100px; }
+.final-exam-status { margin-top: 5px; min-height: 18px; }
+.completion-muted, .completion-summary-empty { color: var(--text-muted); font-size: 12px; }
