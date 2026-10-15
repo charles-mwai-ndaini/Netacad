@@ -569,3 +569,17 @@ body.dark-mode #module-tbody tr:hover td:first-child {
   color: var(--text-muted);
   font-size: 11px;
 }
+
+
+/* Dashboard: students who passed every assessment */
+.completed-students-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+.completed-students-heading h3 { margin:0 0 .35rem; }
+.completed-students-heading p { margin:0; color:var(--text-muted, #718096); font-size:.9rem; }
+.completed-students-count { white-space:nowrap; border-radius:999px; padding:.4rem .75rem; background:var(--primary-light, #ebf4ff); color:var(--primary, #2b6cb0); font-weight:700; font-size:.9rem; }
+.completed-students-table-wrap { width:100%; overflow-x:auto; }
+.completed-students-table { width:100%; border-collapse:collapse; }
+.completed-students-table th, .completed-students-table td { text-align:left; padding:.75rem .65rem; border-bottom:1px solid var(--border, #e2e8f0); }
+.completed-students-table th { font-size:.85rem; color:var(--text-muted, #718096); }
+.completed-students-badge { display:inline-block; padding:.3rem .55rem; border-radius:999px; background:#e6fffa; color:#276749; font-size:.8rem; font-weight:700; }
+.completed-students-empty { margin:0; padding:1rem; border-radius:8px; background:var(--surface, #f7fafc); color:var(--text-muted, #718096); }
+@media (max-width:600px) { .completed-students-heading { flex-direction:column; } }
