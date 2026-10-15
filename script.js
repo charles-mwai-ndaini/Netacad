@@ -1007,21 +1007,92 @@ function renderModuleTable() {
   const classFilterEl = document.getElementById("module-class-filter");
   populateClassFilter(classFilterEl);
   const classFilter = classFilterEl?.value || "";
-  document.getElementById("module-thead").innerHTML = `<tr><th>Student</th>${MODULE_LABELS.map(l => `<th>${l}</th>`).join("")}</tr>`;
+  const thead = document.getElementById("module-thead");
+  const tbody = document.getElementById("module-tbody");
+  if (!thead || !tbody) return;
+
+  thead.innerHTML = `<tr><th>Student</th>${MODULE_LABELS.map(l => `<th>${l}</th>`).join("")}<th>Course Final Exam</th><th>Module Completion</th></tr>`;
   const filtered = db.students.filter(s => s.name.toLowerCase().includes(query) && (!classFilter || s.class === classFilter));
-  document.getElementById("module-tbody").innerHTML = filtered.map(s => {
-    return `<tr><td>${s.name}</td>${MODULES.map(m => `<td><input type="number" min="0" max="100" class="score-input" value="${db.moduleScores[s.id]?.[m] ?? ''}" onchange="saveModScore('${s.id}','${m}',this.value)" /></td>`).join("")}</tr>`;
+
+  tbody.innerHTML = filtered.map(s => {
+    const scores = db.moduleScores[s.id] || {};
+    const finalScore = scores.courseFinalExam ?? "";
+    const finalStatus = finalScore === ""
+      ? '<span class="completion-muted">Not entered</span>'
+      : Number(finalScore) >= 70
+        ? '<span class="badge badge-success">Pass</span>'
+        : '<span class="badge badge-danger">Fail</span>';
+    const completed = MODULES.filter(m => scores[m] !== undefined && scores[m] !== null && scores[m] !== "").length;
+    const pct = MODULES.length ? completed / MODULES.length * 100 : 0;
+
+    return `<tr>
+      <td>${s.name}</td>
+      ${MODULES.map(m => `<td><input type="number" min="0" max="100" step="any" aria-label="${s.name} ${m}" class="score-input" value="${scores[m] ?? ''}" onchange="saveModScore('${s.id}','${m}',this.value)" /></td>`).join("")}
+      <td class="final-exam-cell">
+        <input type="number" min="0" max="100" step="any" aria-label="${s.name} Course Final Exam" class="score-input" value="${finalScore}" onchange="saveCourseFinalExam('${s.id}',this.value)" />
+        <div class="final-exam-status">${finalStatus}</div>
+      </td>
+      <td class="completion-cell">
+        <strong>${pct.toFixed(1)}%</strong>
+        <div class="completion-track"><div class="completion-fill" style="width:${pct}%"></div></div>
+        <small>${completed}/14 completed</small>
+      </td>
+    </tr>`;
   }).join("");
+
+  renderModuleCompletionSummary(db, classFilter);
+}
+
+function renderModuleCompletionSummary(db = loadData(), classFilter = "") {
+  const container = document.getElementById("module-completion-summary");
+  if (!container) return;
+  const students = studentsInClass(db, classFilter);
+  if (!students.length) {
+    container.innerHTML = '<div class="completion-summary-empty">Add students to see module completion.</div>';
+    return;
+  }
+  container.innerHTML = `
+    <div class="completion-summary-heading">
+      <div><h3>${classFilter ? `${classFilter} — ` : "Class-wide "}Module Completion</h3><p>Completion means a score has been recorded; a score of 0 counts as completed.</p></div>
+    </div>
+    <div class="completion-summary-grid">
+      ${MODULES.map((module, i) => {
+        const completed = students.filter(student => {
+          const value = db.moduleScores[student.id]?.[module];
+          return value !== undefined && value !== null && value !== "";
+        }).length;
+        const pct = completed / students.length * 100;
+        return `<div class="completion-summary-item">
+          <div class="completion-summary-label"><strong>${MODULE_LABELS[i]}</strong><span>${pct.toFixed(1)}%</span></div>
+          <div class="completion-track"><div class="completion-fill" style="width:${pct}%"></div></div>
+          <small>${completed}/${students.length} learners</small>
+        </div>`;
+      }).join("")}
+    </div>`;
 }
 
 async function saveModScore(sid, m, val) {
-  if (val !== "" && (isNaN(val) || Number(val) < 0 || Number(val) > 100)) {
-    showToast("⚠ Score must be a number between 0 and 100.", "danger");
+  if (val !== "" && (!Number.isFinite(Number(val)) || Number(val) < 0 || Number(val) > 100)) {
+    showToast("Score must be a number between 0 and 100.", "danger");
     renderModuleTable();
     return;
   }
   try {
     await db.collection('moduleScores').doc(sid).set({ [m]: val }, { merge: true });
+  } catch (err) {
+    showToast(friendlyFirebaseError(err), "danger");
+  }
+}
+
+async function saveCourseFinalExam(sid, val) {
+  if (val !== "" && (!Number.isFinite(Number(val)) || Number(val) < 0 || Number(val) > 100)) {
+    showToast("Course Final Exam score must be between 0 and 100.", "danger");
+    renderModuleTable();
+    return;
+  }
+  try {
+    await db.collection("moduleScores").doc(sid).set({ courseFinalExam: val }, { merge: true });
+    showToast(val === "" ? "Course Final Exam score cleared." : `Course Final Exam saved: ${Number(val) >= 70 ? "Pass" : "Fail"}.`);
   } catch (err) {
     showToast(friendlyFirebaseError(err), "danger");
   }
@@ -1270,10 +1341,11 @@ function downloadModuleScoreTemplate() {
   const classFilter = document.getElementById("module-class-filter")?.value || "";
   const students = studentsInClass(db, classFilter)
     .slice().sort((a, b) => a.name.localeCompare(b.name));
-  const headers = ["Name", "Class", ...MODULE_LABELS];
+  const headers = ["Name", "Class", ...MODULE_LABELS, "Course Final Exam"];
   const rows = students.map(s => {
     const row = { "Name": s.name, "Class": s.class || "" };
     MODULES.forEach((m, i) => row[MODULE_LABELS[i]] = db.moduleScores[s.id]?.[m] ?? "");
+    row["Course Final Exam"] = db.moduleScores[s.id]?.courseFinalExam ?? "";
     return row;
   });
   downloadCSV(`Module_Scores_Template_${classFilter ? classFilter.replace(/\s+/g,'_') : 'All_Classes'}.csv`, buildCSV(headers, rows));
@@ -1291,11 +1363,14 @@ async function handleBulkModuleUpload() {
     // Map each recognized column header back to its module key (m1..m14),
     // matching case-insensitively against MODULE_LABELS ("Module 1" etc.)
     const colToModule = {};
+    let finalExamColumn = null;
     headers.forEach(h => {
-      const idx = MODULE_LABELS.findIndex(l => l.toLowerCase() === h.trim().toLowerCase());
+      const normalized = h.trim().toLowerCase();
+      const idx = MODULE_LABELS.findIndex(l => l.toLowerCase() === normalized);
       if (idx !== -1) colToModule[h] = MODULES[idx];
+      if (normalized === "course final exam") finalExamColumn = h;
     });
-    if (!Object.keys(colToModule).length) {
+    if (!Object.keys(colToModule).length && !finalExamColumn) {
       showToast("⚠ No recognizable module columns found in CSV.", "danger");
       return;
     }
@@ -1315,7 +1390,7 @@ async function handleBulkModuleUpload() {
         Object.entries(colToModule).forEach(([col, key]) => {
           const raw = (row[col] || "").trim();
           if (raw === "") return;
-          if (isNaN(raw) || Number(raw) < 0 || Number(raw) > 100) {
+          if (!Number.isFinite(Number(raw)) || Number(raw) < 0 || Number(raw) > 100) {
             invalid.push(`${student.name} — ${col}: "${raw}"`);
             return;
           }
@@ -1323,6 +1398,18 @@ async function handleBulkModuleUpload() {
           hasUpdate = true;
           scoreWrites++;
         });
+        if (finalExamColumn) {
+          const raw = (row[finalExamColumn] || "").trim();
+          if (raw !== "") {
+            if (!Number.isFinite(Number(raw)) || Number(raw) < 0 || Number(raw) > 100) {
+              invalid.push(`${student.name} — ${finalExamColumn}: "${raw}"`);
+            } else {
+              updates.courseFinalExam = raw;
+              hasUpdate = true;
+              scoreWrites++;
+            }
+          }
+        }
         if (hasUpdate) {
           batch.set(db.collection('moduleScores').doc(student.id), updates, { merge: true });
           updatedStudents++;
