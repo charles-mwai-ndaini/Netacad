@@ -553,3 +553,19 @@ body.dark-mode #module-tbody tr:hover td:first-child {
 .final-exam-cell { min-width: 100px; }
 .final-exam-status { margin-top: 5px; min-height: 18px; }
 .completion-muted, .completion-summary-empty { color: var(--text-muted); font-size: 12px; }
+
+
+/* Overall pass-based completion summary */
+.completion-overall {
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+}
+.completion-overall small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
